@@ -1,0 +1,32 @@
+name: _Notify Vulnerabilities
+
+on:
+  workflow_call:
+    inputs:
+      service-name:
+        required: true
+        type: string
+        description: "Name of the service (e.g. notification-service)"
+    secrets:
+      BREVO_API_KEY:
+        required: true
+      ALERT_EMAIL:
+        required: true
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Brevo Email Notification
+        run: |
+          curl --request POST \
+            --url https://api.brevo.com/v3/smtp/email \
+            --header 'accept: application/json' \
+            --header 'api-key: ${{ secrets.BREVO_API_KEY }}' \
+            --header 'content-type: application/json' \
+            --data '{
+              "sender": {"name": "QuickHaul CI/CD Security", "email": "security@quickhaul.com"},
+              "to": [{"email": "${{ secrets.ALERT_EMAIL }}", "name": "Security Team"}],
+              "subject": "🚨 Critical: Security or Quality Failure in ${{ inputs.service-name }}",
+              "htmlContent": "<h3>Security / Quality Alert</h3><p>A failure was detected during the CI build for <b>${{ inputs.service-name }}</b>.</p><p>Please check the <a href=\"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\">GitHub Actions Logs</a> immediately to resolve the vulnerabilities or code quality issues.</p>"
+            }'
