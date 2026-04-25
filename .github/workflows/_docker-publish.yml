@@ -1,0 +1,128 @@
+# fitforge-shared/.github/workflows/_docker-publish.yml
+name: _Docker Publish — Tag, Build & Push
+
+on:
+  workflow_call:
+    inputs:
+      service-name:
+        description: "Service name (used for image name and tag prefix)"
+        required: true
+        type: string
+      service-path:
+        description: "Path to Dockerfile"
+        required: false
+        type: string
+        default: "."
+      environment:
+        description: "Environment branch (develop or main)"
+        required: true
+        type: string
+    secrets:
+      DOCKER_USERNAME:
+        required: true
+      DOCKER_PASSWORD:
+        required: true
+    outputs:
+      image-tag:
+        description: "The Docker image tag that was built and pushed"
+        value: ${{ jobs.publish.outputs.tag }}
+      image-full:
+        description: "Full image reference (registry/name:tag)"
+        value: ${{ jobs.publish.outputs.full_image }}
+
+jobs:
+  publish:
+    name: Publish Image
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      full_image: ${{ steps.tag.outputs.full_image }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.service-path }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ─── Version Tagging ───
+      - name: Calculate Semantic Version (Main Only)
+        id: semver
+        if: inputs.environment == 'main'
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ github.token }}
+          tag_prefix: ${{ inputs.service-name }}-v
+          dry_run: true
+          default_bump: patch
+
+      - name: Generate Tag
+        id: tag
+        run: |
+          if [ "${{ inputs.environment }}" = "main" ]; then
+            TAG="${{ steps.semver.outputs.new_tag }}"
+          else
+            TAG="dev-${GITHUB_SHA}"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "full_image=${{ secrets.DOCKER_USERNAME }}/${{ inputs.service-name }}:$TAG" >> $GITHUB_OUTPUT
+          echo "🏷️ Image tag: $TAG"
+
+      # ─── Tag Validation ───
+      - name: Validate Existing Git Tag
+        id: tag_check
+        run: |
+          TAG=${{ steps.tag.outputs.tag }}
+          git fetch --tags origin || true
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            TAG_COMMIT=$(git rev-list -n 1 "$TAG")
+            CURRENT_COMMIT=$(git rev-parse HEAD)
+            if [ "$TAG_COMMIT" != "$CURRENT_COMMIT" ]; then
+              echo "❌ Tag exists but points to different commit!"
+              exit 1
+            fi
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      # ─── Docker Login ───
+      - name: Login to Docker Hub
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      # ─── Image Check (Skip if Already Exists) ───
+      - name: Check if Image Already Exists
+        id: image_check
+        run: |
+          if docker manifest inspect ${{ steps.tag.outputs.full_image }} > /dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "⏭️ Image already exists. Skipping build."
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      # ─── Build ───
+      - name: Build Docker Image
+        id: docker_build
+        if: steps.image_check.outputs.exists != 'true'
+        run: |
+          docker build -t ${{ steps.tag.outputs.full_image }} .
+          echo "built=true" >> $GITHUB_OUTPUT
+
+      # ─── Push Image ───
+      - name: Push Docker Image
+        if: steps.docker_build.outputs.built == 'true'
+        run: |
+          docker push ${{ steps.tag.outputs.full_image }}
+          echo "✅ Pushed: ${{ steps.tag.outputs.full_image }}"
+
+      # ─── Create Git Tag ───
+      - name: Create Git Tag
+        if: inputs.environment == 'main' && steps.tag_check.outputs.exists != 'true'
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git tag ${{ steps.tag.outputs.tag }}
+          git push origin ${{ steps.tag.outputs.tag }}
+          echo "🏷️ Git tag created: ${{ steps.tag.outputs.tag }}"

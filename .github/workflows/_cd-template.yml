@@ -6,7 +6,7 @@ on:
       service-name:
         required: true
         type: string
-        description: "Name of the service folder in quickhaul-charts/microservices"
+        description: "Name of the service folder in fitforge-charts/microservices"
       image-tag:
         required: true
         type: string
@@ -18,7 +18,7 @@ on:
     secrets:
       HELM_REPO_PAT:
         required: true
-        description: "PAT with push access to quickhaul-charts repo"
+        description: "PAT with push access to fitforge-charts repo"
 
 jobs:
   update-chart:
@@ -28,7 +28,7 @@ jobs:
       - name: Checkout Charts Repository
         uses: actions/checkout@v4
         with:
-          repository: QuickHaulTransits/quickhaul-charts
+          repository: fitforge101/fitforge-charts
           token: ${{ secrets.HELM_REPO_PAT }}
           path: charts
           ref: ${{ inputs.environment }}
@@ -41,6 +41,7 @@ jobs:
           FILE="charts/microservices/${{ inputs.service-name }}/values.yaml"
           if [ -f "$FILE" ]; then
             echo "Updating $FILE with tag ${{ inputs.image-tag }}"
+            # Update the tag value. Ensure it's treated as a string to preserve formatting.
             yq -i ".image.tag = \"${{ inputs.image-tag }}\"" "$FILE"
           else
             echo "::error::File not found: $FILE (Is your service-name correct?)"
@@ -49,6 +50,7 @@ jobs:
 
       - name: Validate values.yaml
         run: |
+          # Ensure the YAML is still valid after modification
           yq eval '.' "charts/microservices/${{ inputs.service-name }}/values.yaml" > /dev/null
 
       - name: Commit and Push changes
@@ -56,9 +58,12 @@ jobs:
           cd charts
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Stage the specific values file
           git add microservices/${{ inputs.service-name }}/values.yaml
+          
           if git diff --staged --quiet; then
-            echo "No changes detected"
+            echo "No changes detected in values.yaml (tag might already be up to date)"
           else
             git commit -m "cd: update ${{ inputs.service-name }} image tag to ${{ inputs.image-tag }} [${{ inputs.environment }}]"
             git push origin ${{ inputs.environment }}
