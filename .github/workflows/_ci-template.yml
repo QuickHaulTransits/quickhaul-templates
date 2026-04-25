@@ -1,5 +1,5 @@
 name: CI Template
-
+## This is the CI template which can be used by all services to perform CI 
 on:
   workflow_call:
     inputs:
