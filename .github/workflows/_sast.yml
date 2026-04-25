@@ -9,6 +9,16 @@ on:
         required: false
         type: string
         default: "."
+      setup-command:
+        description: "Command to setup environment (e.g. install dependencies)"
+        required: false
+        type: string
+        default: ""
+      test-command:
+        description: "Command to run tests and generate coverage"
+        required: false
+        type: string
+        default: ""
     secrets:
       SONAR_TOKEN:
         required: true
@@ -30,6 +40,18 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Setup Environment
+        if: inputs.setup-command != ''
+        run: |
+          cd ${{ inputs.service-path }}
+          ${{ inputs.setup-command }}
+
+      - name: Run Tests
+        if: inputs.test-command != ''
+        run: |
+          cd ${{ inputs.service-path }}
+          ${{ inputs.test-command }}
 
       - name: Run SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v6
