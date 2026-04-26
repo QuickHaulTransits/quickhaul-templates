@@ -25,6 +25,8 @@ on:
     secrets:
       BREVO_API_KEY:
         required: true
+      ALERT_EMAIL:
+        required: true
 
 jobs:
   send-email:
@@ -49,13 +51,14 @@ jobs:
             --header "api-key: $BREVO_API_KEY" \
             --header "content-type: application/json" \
             --data "{
-              \"sender\": {\"name\": \"CI/CD Pipeline\", \"email\": \"fitforge360.in@gmail.com\"},
-              \"to\": [{\"email\": \"fitforge360.in@gmail.com\"}],
+              \"sender\": {\"name\": \"CI/CD Pipeline\", \"email\": \"$ALERT_EMAIL\"},
+              \"to\": [{\"email\": \"$ALERT_EMAIL\"}],
               \"subject\": \"${{ inputs.subject }}\",
-              \"textContent\": \"${{ inputs.body }}\n\nService: ${{ inputs.service-name }}\nRepo: ${{ github.repository }}\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
+              \"textContent\": \"${{ inputs.body }}\n\nService: ${{ inputs.service-name }}\nRepo: ${{ github.repository }}\nRun: ${{ github.server_url }}/${{ github.repository ... actions/runs/${{ github.run_id }}\"
             }"
         env:
           BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
 
       # ─── Send Email With Attachment ───
       - name: Send Email (With Attachment)
@@ -68,10 +71,10 @@ jobs:
 
           cat > /tmp/brevo-payload.json << PAYLOAD_EOF
           {
-            "sender": {"name": "CI/CD Pipeline", "email": "fitforge360.in@gmail.com"},
-            "to": [{"email": "fitforge360.in@gmail.com"}],
+            "sender": {"name": "CI/CD Pipeline", "email": "$ALERT_EMAIL"},
+            "to": [{"email": "$ALERT_EMAIL"}],
             "subject": "${{ inputs.subject }}",
-            "textContent": "${{ inputs.body }}\n\nService: ${{ inputs.service-name }}\nRepo: ${{ github.repository }}\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+            "textContent": "${{ inputs.body }}\n\nService: ${{ inputs.service-name }}\nRepo: ${{ github.repository }}\nRun: ${{ github.server_url }}/${{ github.repository ... actions/runs/${{ github.run_id }}",
             "attachment": [{"name": "$REPORT_NAME", "content": "$REPORT_BASE64"}]
           }
           PAYLOAD_EOF
@@ -84,3 +87,4 @@ jobs:
             --data @/tmp/brevo-payload.json
         env:
           BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
