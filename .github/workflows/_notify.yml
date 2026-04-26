@@ -54,7 +54,7 @@ jobs:
               \"sender\": {\"name\": \"CI/CD Pipeline\", \"email\": \"$ALERT_EMAIL\"},
               \"to\": [{\"email\": \"$ALERT_EMAIL\"}],
               \"subject\": \"${{ inputs.subject }}\",
-              \"textContent\": \"${{ inputs.body }}\n\nService: ${{ inputs.service-name }}\nRepo: ${{ github.repository }}\nRun: ${{ github.server_url }}/${{ github.repository ... actions/runs/${{ github.run_id }}\"
+              \"textContent\": \"${{ inputs.body }}\n\nService: ${{ inputs.service-name }}\nRepo: ${{ github.repository }}\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
             }"
         env:
           BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
@@ -74,7 +74,7 @@ jobs:
             "sender": {"name": "CI/CD Pipeline", "email": "$ALERT_EMAIL"},
             "to": [{"email": "$ALERT_EMAIL"}],
             "subject": "${{ inputs.subject }}",
-            "textContent": "${{ inputs.body }}\n\nService: ${{ inputs.service-name }}\nRepo: ${{ github.repository }}\nRun: ${{ github.server_url }}/${{ github.repository ... actions/runs/${{ github.run_id }}",
+            "textContent": "${{ inputs.body }}\n\nService: ${{ inputs.service-name }}\nRepo: ${{ github.repository }}\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
             "attachment": [{"name": "$REPORT_NAME", "content": "$REPORT_BASE64"}]
           }
           PAYLOAD_EOF
