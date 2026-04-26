@@ -32,6 +32,9 @@ jobs:
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
         with:
           image-ref: 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ inputs.image-name }}:${{ github.sha }}'
           format: 'table'
