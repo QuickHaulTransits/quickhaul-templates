@@ -57,6 +57,10 @@ jobs:
           dry_run: true
           default_bump: patch
 
+      - name: Lowercase Repository Owner
+        id: owner
+        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_OUTPUT
+
       - name: Generate Tag
         id: tag
         run: |
@@ -66,7 +70,7 @@ jobs:
             TAG="dev-${GITHUB_SHA}"
           fi
           echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "full_image=ghcr.io/${{ github.repository_owner }}/${{ inputs.service-name }}:$TAG" >> $GITHUB_OUTPUT
+          echo "full_image=ghcr.io/${{ steps.owner.outputs.owner }}/${{ inputs.service-name }}:$TAG" >> $GITHUB_OUTPUT
           echo "🏷️ Image tag: $TAG"
 
       # ─── Tag Validation ───
