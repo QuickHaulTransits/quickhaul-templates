@@ -66,7 +66,7 @@ jobs:
             TAG="dev-${GITHUB_SHA}"
           fi
           echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "full_image=${{ secrets.DOCKER_USERNAME }}/${{ inputs.service-name }}:$TAG" >> $GITHUB_OUTPUT
+          echo "full_image=ghcr.io/${{ github.repository_owner }}/${{ inputs.service-name }}:$TAG" >> $GITHUB_OUTPUT
           echo "🏷️ Image tag: $TAG"
 
       # ─── Tag Validation ───
@@ -88,8 +88,8 @@ jobs:
           fi
 
       # ─── Docker Login ───
-      - name: Login to Docker Hub
-        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+      - name: Login to GitHub Container Registry
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       # ─── Image Check (Skip if Already Exists) ───
       - name: Check if Image Already Exists
