@@ -28,7 +28,7 @@ jobs:
       - name: Checkout Charts Repository
         uses: actions/checkout@v4
         with:
-          repository: fitforge101/fitforge-charts
+          repository: QuickHaulTransits/quickhaul-charts
           token: ${{ secrets.HELM_REPO_PAT }}
           path: charts
           ref: ${{ inputs.environment }}
