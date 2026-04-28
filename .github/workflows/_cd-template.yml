@@ -6,19 +6,19 @@ on:
       service-name:
         required: true
         type: string
-        description: "Name of the service folder in fitforge-charts/microservices"
+        description: "Name of the service (e.g. auth-service, frontend)"
       image-tag:
         required: true
         type: string
-        description: "New image tag to update in values.yaml"
+        description: "New image tag to update in global-values.yaml"
       environment:
         required: true
         type: string
-        description: "Target environment (main/develop)"
+        description: "Target environment branch (main/develop)"
     secrets:
       HELM_REPO_PAT:
         required: true
-        description: "PAT with push access to fitforge-charts repo"
+        description: "PAT with push access to quickhaul-config repo"
 
 jobs:
   update-chart:
@@ -36,22 +36,32 @@ jobs:
       - name: Setup yq
         uses: mikefarah/yq@v4.44.1
 
-      - name: Update image tag
+      - name: Update image configuration
         run: |
-          FILE="charts/microservices/${{ inputs.service-name }}/values.yaml"
+          FILE="helm-charts/global-values.yaml"
+          
           if [ -f "$FILE" ]; then
             echo "Updating $FILE with tag ${{ inputs.image-tag }}"
-            # Update the tag value. Ensure it's treated as a string to preserve formatting.
-            yq -i ".image.tag = \"${{ inputs.image-tag }}\"" "$FILE"
+            
+            # Extract basic service name (e.g. auth-service -> auth, frontend -> frontend)
+            SERVICE_PREFIX="${{ inputs.service-name }}"
+            SERVICE_KEY=${SERVICE_PREFIX%-service}
+            
+            # Construct the new immutable container path target
+            NEW_IMAGE="ghcr.io/quickhaultransits/quickhaul-${SERVICE_KEY}:${{ inputs.image-tag }}"
+            
+            # Update the global-values.yaml safely preserving spacing
+            yq -i ".global.images.${SERVICE_KEY} = \"${NEW_IMAGE}\"" "$FILE"
+            
           else
-            echo "::error::File not found: $FILE (Is your service-name correct?)"
+            echo "::error::File not found: $FILE"
             exit 1
           fi
 
       - name: Validate values.yaml
         run: |
           # Ensure the YAML is still valid after modification
-          yq eval '.' "charts/microservices/${{ inputs.service-name }}/values.yaml" > /dev/null
+          yq eval '.' "charts/helm-charts/global-values.yaml" > /dev/null
 
       - name: Commit and Push changes
         run: |
@@ -59,12 +69,12 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Stage the specific values file
-          git add microservices/${{ inputs.service-name }}/values.yaml
+          # Stage the unified global values file
+          git add helm-charts/global-values.yaml
           
           if git diff --staged --quiet; then
-            echo "No changes detected in values.yaml (tag might already be up to date)"
+            echo "No changes detected in global-values.yaml (tag might already be up to date)"
           else
-            git commit -m "cd: update ${{ inputs.service-name }} image tag to ${{ inputs.image-tag }} [${{ inputs.environment }}]"
+            git commit -m "cd: update ${{ inputs.service-name }} image version to ${{ inputs.image-tag }} [${{ inputs.environment }}]"
             git push origin ${{ inputs.environment }}
           fi
