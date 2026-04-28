@@ -28,7 +28,7 @@ jobs:
       - name: Checkout Charts Repository
         uses: actions/checkout@v4
         with:
-          repository: QuickHaulTransits/quickhaul-charts
+          repository: QuickHaulTransits/quickhaul-config
           token: ${{ secrets.HELM_REPO_PAT }}
           path: charts
           ref: ${{ inputs.environment }}
