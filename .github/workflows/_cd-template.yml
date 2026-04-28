@@ -38,7 +38,7 @@ jobs:
 
       - name: Update image configuration
         run: |
-          FILE="helm-charts/global-values.yaml"
+          FILE="charts/helm-charts/global-values.yaml"
           
           if [ -f "$FILE" ]; then
             echo "Updating $FILE with tag ${{ inputs.image-tag }}"
