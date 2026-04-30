@@ -1,112 +1,130 @@
 # 🚚 QuickHaul: Enterprise GitOps & CI/CD Framework
 
-Welcome to the **QuickHaul Templates** repository. This is the centralized "Workflow Library" for the QuickHaul ecosystem, providing reusable, enterprise-grade GitHub Action templates for Continuous Integration (CI) and triggering Continuous Deployment (CD).
+![QuickHaul Banner](./quickhaul_banner_1777567083825.png)
 
-> [!TIP]
-> **New to the project?** Follow the [Detailed Setup Guide (EC2, SonarQube, ArgoCD)](./SETUP_GUIDE.md) to get your infrastructure up and running.
-
----
-
-## 🏗️ The QuickHaul Ecosystem Architecture
-
-The project is split into three main components to ensure a clean separation of concerns and a robust GitOps workflow:
-
-1.  **Microservice Repositories**: (e.g., `quickhaul-auth`, `quickhaul-booking`) These repositories contain the source code and use the templates in this repo to build and test their applications.
-2.  **`quickhaul-templates` (This Repo)**: Centralized logic for CI/CD. Any change here propagates to all microservices, ensuring consistency across the platform.
-3.  **[`quickhaul-config`](https://github.com/QuickHaulTransits/quickhaul-config)**: The GitOps **Source of Truth**. It contains Helm charts, ArgoCD Application manifests, and handles the actual deployment to Kubernetes.
+Welcome to the **QuickHaul Templates** repository—the engineering heart of the QuickHaul logistics ecosystem. This repository serves as a centralized, high-performance "Workflow Engine" that powers Continuous Integration and GitOps-driven Deployment for our entire microservices fleet.
 
 ---
 
-## 🔄 The CI/CD Lifecycle
+## ✨ Key Features
+
+-   🛡️ **Security-First CI**: Automated SAST (SonarQube), SCA (Snyk), and Image Scanning (Trivy).
+-   🎡 **GitOps Engine**: Native integration with ArgoCD and Helm for declarative deployments.
+-   🚀 **Zero-Downtime**: Support for Argo Rollouts (Blue-Green/Canary) in Production.
+-   📦 **GHCR Integrated**: Optimized for GitHub Container Registry with secret-less OIDC/Token auth.
+-   📢 **Smart Alerts**: Real-time vulnerability notifications via Brevo Email API.
+
+---
+
+## 🏗️ System Architecture
+
+Our architecture decouples **Application Logic** from **Infrastructure State**, using this repository as the bridge.
 
 ```mermaid
 graph TD
-    subgraph "CI: Build & Secure"
-        A[Code Push/PR] -->|Trigger| B[Service Workflow]
-        B -->|Call| C{_ci-template.yml}
-        C --> D[SonarQube SAST]
-        C --> E[Snyk Dependency Scan]
-        C --> F[Docker Build]
-        F --> G[Trivy Image Scan]
-        G --> H{Critical Found?}
-        H -->|Yes| I[Brevo Email Alert]
-        H -->|No| J[Push to Registry]
+    subgraph "1. Application Layer"
+        A[Auth Service]
+        B[Booking Service]
+        C[Location Service]
     end
 
-    subgraph "CD: GitOps Transition"
-        J -->|Trigger| K{_cd-template.yml}
-        K -->|Update values.yaml| L[quickhaul-config Repo]
+    subgraph "2. Shared Logic (This Repo)"
+        D{CI/CD Templates}
     end
 
-    subgraph "Ops: Cluster Sync"
-        L -->|Webhook| M[ArgoCD Controller]
-        M -->|Sync State| N[K8s Cluster]
-        N -->|Dev| O[Rolling Update]
-        N -->|Prod| P[Argo Rollouts Blue-Green]
-        P --> Q[DAST Security Scan]
+    subgraph "3. Infrastructure State"
+        E[quickhaul-config Repo]
+        F[Helm Charts]
     end
+
+    subgraph "4. Deployment"
+        G[ArgoCD]
+        H[Kubernetes Cluster]
+    end
+
+    A & B & C -->|Calls| D
+    D -->|Updates| E
+    E --> F
+    F -->|Sync| G
+    G --> H
 ```
 
 ---
 
-## 🛡️ Security-First Approach
+## 📂 The Repository Map
 
-Our CI/CD pipeline implements security at every stage:
--   **SAST (Static Application Security Testing)**: SonarQube analyzes code for bugs, vulnerabilities, and code smells.
--   **SCA (Software Composition Analysis)**: Snyk checks third-party libraries for known vulnerabilities.
--   **Container Scanning**:
-    *   **Trivy** scans every Docker image for OS and library vulnerabilities before push.
-    *   Images are pushed to **GHCR (GitHub Container Registry)**.
--   **DAST (Dynamic Application Security Testing)**: OWASP ZAP scans the live production environment after deployment (configured in `quickhaul-config`).
--   **EC2 Infrastructure**: Recommended to run on `t3.medium` instances with `k3s` or `EKS`.
+| Category | Repository | Role |
+| :--- | :--- | :--- |
+| **Logic** | [**quickhaul-templates**](https://github.com/QuickHaulTransits/quickhaul-templates) | (Current) Centralized CI/CD YAMLs. |
+| **State** | [**quickhaul-config**](https://github.com/QuickHaulTransits/quickhaul-config) | GitOps manifests & Helm Charts. |
+| **Services** | [**auth-service**](https://github.com/QuickHaulTransits/auth-service) | Identity & Access Management. |
+| **Services** | [**booking-service**](https://github.com/QuickHaulTransits/booking-service) | Core logistics & transportation logic. |
+| **Services** | [**notification-service**](https://github.com/QuickHaulTransits/notification-service) | Multi-channel communication gateway. |
 
 ---
 
-## 🛠️ Usage Guide
+## 🔄 End-to-End Lifecycle
 
-### Integrating a new Microservice
+### 🔍 Phase 1: Quality & Security (CI)
+Every commit undergoes a rigorous validation process:
+1.  **Code Analysis**: SonarQube scans for vulnerabilities and maintainability.
+2.  **Dependencies**: Snyk checks for outdated or insecure libraries.
+3.  **Containerization**: Docker builds the service image.
+4.  **Artifact Audit**: Trivy scans the final image for OS-level flaws.
+5.  **Distribution**: Verified images are pushed to **GHCR**.
 
-To use these templates in a new service, create a workflow file at `.github/workflows/pipeline.yml`:
+### 🚀 Phase 2: GitOps Transition (CD)
+The pipeline "hands over" the build to the infrastructure:
+1.  **Tag Update**: Our CD template uses `yq` to update the Helm `values.yaml` in the config repo.
+2.  **Commit**: The new state is committed to Git, creating an audit trail.
+
+### ☸️ Phase 3: Cluster Sync (ArgoCD)
+ArgoCD reconciles the cluster with the Git state:
+1.  **Detection**: ArgoCD picks up the new image tag from the config repo.
+2.  **Rollout**: Argo Rollouts manages a Blue-Green deployment to ensure zero user impact.
+3.  **Verification**: Post-deployment DAST (OWASP ZAP) scans the live environment.
+
+---
+
+## 🛠️ Quickstart Guide
+
+### 1. Setup Infrastructure
+To run this ecosystem on an **AWS EC2 (t3.medium)**, follow our:
+👉 [**Full Setup & Installation Guide (EC2, Sonar, ArgoCD)**](./SETUP_GUIDE.md)
+
+### 2. Integrate a Microservice
+Add this to your service's `.github/workflows/main.yml`:
 
 ```yaml
-name: Production Pipeline
-
-on:
-  push:
-    branches: [ main ]
-
 jobs:
-  # 1. Run CI: Build, Test, and Scan
-  ci:
+  build:
     uses: QuickHaulTransits/quickhaul-templates/.github/workflows/_ci-template.yml@main
     with:
-      service-name: "my-service"
-      service-path: "./"
+      service-name: "your-service"
       environment: "main"
-      runtime: "node" # or "python"
-    secrets: inherit # Automatically passes all secrets
+    secrets: inherit
 
-  # 2. Run CD: Update GitOps Manifests
-  cd:
-    needs: ci
-    if: github.event_name != 'pull_request'
+  deploy:
+    needs: build
     uses: QuickHaulTransits/quickhaul-templates/.github/workflows/_cd-template.yml@main
     with:
-      service-name: "my-service"
-      image-tag: ${{ needs.ci.outputs.tag }}
+      service-name: "your-service"
+      image-tag: ${{ needs.build.outputs.tag }}
       environment: "main"
     secrets: inherit
 ```
 
 ---
 
-## 📂 Template Directory Structure
+## 🛡️ Security Pillars
 
--   `_ci-template.yml`: The main engine for building and scanning microservices.
--   `_cd-template.yml`: Handles the cross-repository update to the GitOps config repo.
--   `_docker-publish.yml`: Specialized workflow for pushing images to registries (DockerHub/GHCR).
--   `_sast.yml` / `_sca.yml`: Modular templates for security scanning.
--   `_notify.yml`: Centralized notification logic (Brevo/Email).
+| Tool | Focus | Stage |
+| :--- | :--- | :--- |
+| **SonarQube** | Code Quality / SAST | Pre-Build |
+| **Snyk** | Supply Chain / SCA | Pre-Build |
+| **Trivy** | Image Integrity | Post-Build |
+| **GHCR** | Secure Registry | Distribution |
+| **OWASP ZAP** | Runtime Security / DAST | Post-Deploy |
 
 ---
-*Maintained by the **QuickHaul DevOps Team**. For cluster bootstrapping and deployment manifests, visit the [quickhaul-config](https://github.com/QuickHaulTransits/quickhaul-config) repository.*
+*Developed with ❤️ by the **QuickHaul DevOps Team**.*
