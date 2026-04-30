@@ -6,7 +6,7 @@ on:
       service-name:
         required: true
         type: string
-        description: "Name of the service folder in fitforge-charts/microservices"
+        description: "Name of the service folder in quickhaul-config/helm-charts/microservices"
       image-tag:
         required: true
         type: string
@@ -18,7 +18,7 @@ on:
     secrets:
       HELM_REPO_PAT:
         required: true
-        description: "PAT with push access to fitforge-charts repo"
+        description: "PAT with push access to quickhaul-config repo"
 
 jobs:
   update-chart:
@@ -28,7 +28,7 @@ jobs:
       - name: Checkout Charts Repository
         uses: actions/checkout@v4
         with:
-          repository: fitforge101/fitforge-charts
+          repository: QuickHaulTransits/quickhaul-config
           token: ${{ secrets.HELM_REPO_PAT }}
           path: charts
           ref: ${{ inputs.environment }}
@@ -38,7 +38,7 @@ jobs:
 
       - name: Update image tag
         run: |
-          FILE="charts/microservices/${{ inputs.service-name }}/values.yaml"
+          FILE="charts/helm-charts/microservices/${{ inputs.service-name }}/values.yaml"
           if [ -f "$FILE" ]; then
             echo "Updating $FILE with tag ${{ inputs.image-tag }}"
             # Update the tag value. Ensure it's treated as a string to preserve formatting.
@@ -51,7 +51,7 @@ jobs:
       - name: Validate values.yaml
         run: |
           # Ensure the YAML is still valid after modification
-          yq eval '.' "charts/microservices/${{ inputs.service-name }}/values.yaml" > /dev/null
+          yq eval '.' "charts/helm-charts/microservices/${{ inputs.service-name }}/values.yaml" > /dev/null
 
       - name: Commit and Push changes
         run: |
@@ -60,7 +60,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
           # Stage the specific values file
-          git add microservices/${{ inputs.service-name }}/values.yaml
+          git add helm-charts/microservices/${{ inputs.service-name }}/values.yaml
           
           if git diff --staged --quiet; then
             echo "No changes detected in values.yaml (tag might already be up to date)"
