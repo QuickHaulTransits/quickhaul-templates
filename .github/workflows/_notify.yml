@@ -1,12 +1,27 @@
-name: _Notify Vulnerabilities
+# fitforge-shared/.github/workflows/_notify.yml
+name: _Notify — Email Alert (Brevo)
 
 on:
   workflow_call:
     inputs:
-      service-name:
+      subject:
+        description: "Email subject line"
         required: true
         type: string
-        description: "Name of the service (e.g. notification-service)"
+      body:
+        description: "Email body text"
+        required: true
+        type: string
+      service-name:
+        description: "Service name for context"
+        required: false
+        type: string
+        default: ""
+      artifact-name:
+        description: "Name of the artifact to download and attach (optional)"
+        required: false
+        type: string
+        default: ""
     secrets:
       BREVO_API_KEY:
         required: true
@@ -14,19 +29,62 @@ on:
         required: true
 
 jobs:
-  notify:
+  send-email:
+    name: Send Email Alert
     runs-on: ubuntu-latest
     steps:
-      - name: Send Brevo Email Notification
+      # ─── Download Report Artifact (if provided) ───
+      - name: Download Report Artifact
+        if: inputs.artifact-name != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: ./report
+
+      # ─── Send Email Without Attachment ───
+      - name: Send Email (No Attachment)
+        if: inputs.artifact-name == ''
         run: |
           curl --request POST \
             --url https://api.brevo.com/v3/smtp/email \
-            --header 'accept: application/json' \
-            --header 'api-key: ${{ secrets.BREVO_API_KEY }}' \
-            --header 'content-type: application/json' \
-            --data '{
-              "sender": {"name": "QuickHaul CI/CD Security", "email": "security@quickhaul.com"},
-              "to": [{"email": "${{ secrets.ALERT_EMAIL }}", "name": "Security Team"}],
-              "subject": "🚨 Critical: Security or Quality Failure in ${{ inputs.service-name }}",
-              "htmlContent": "<h3>Security / Quality Alert</h3><p>A failure was detected during the CI build for <b>${{ inputs.service-name }}</b>.</p><p>Please check the <a href=\"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\">GitHub Actions Logs</a> immediately to resolve the vulnerabilities or code quality issues.</p>"
-            }'
+            --header "accept: application/json" \
+            --header "api-key: $BREVO_API_KEY" \
+            --header "content-type: application/json" \
+            --data "{
+              \"sender\": {\"name\": \"CI/CD Pipeline\", \"email\": \"$ALERT_EMAIL\"},
+              \"to\": [{\"email\": \"$ALERT_EMAIL\"}],
+              \"subject\": \"${{ inputs.subject }}\",
+              \"textContent\": \"${{ inputs.body }}\n\nService: ${{ inputs.service-name }}\nRepo: ${{ github.repository }}\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
+            }"
+        env:
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+
+      # ─── Send Email With Attachment ───
+      - name: Send Email (With Attachment)
+        if: inputs.artifact-name != ''
+        run: |
+          # Find the report file (could be .html or .txt)
+          REPORT_FILE=$(find ./report -type f | head -1)
+          REPORT_NAME=$(basename "$REPORT_FILE")
+          REPORT_BASE64=$(base64 -w 0 "$REPORT_FILE")
+
+          cat > /tmp/brevo-payload.json << PAYLOAD_EOF
+          {
+            "sender": {"name": "CI/CD Pipeline", "email": "$ALERT_EMAIL"},
+            "to": [{"email": "$ALERT_EMAIL"}],
+            "subject": "${{ inputs.subject }}",
+            "textContent": "${{ inputs.body }}\n\nService: ${{ inputs.service-name }}\nRepo: ${{ github.repository }}\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+            "attachment": [{"name": "$REPORT_NAME", "content": "$REPORT_BASE64"}]
+          }
+          PAYLOAD_EOF
+
+          curl --request POST \
+            --url https://api.brevo.com/v3/smtp/email \
+            --header "accept: application/json" \
+            --header "api-key: $BREVO_API_KEY" \
+            --header "content-type: application/json" \
+            --data @/tmp/brevo-payload.json
+        env:
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}

@@ -6,7 +6,7 @@ on:
       service-name:
         required: true
         type: string
-        description: "Name of the service folder in quickhaul-charts/microservices"
+        description: "Name of the service (e.g. auth-service, frontend)"
       image-tag:
         required: true
         type: string
@@ -14,11 +14,11 @@ on:
       environment:
         required: true
         type: string
-        description: "Target environment (main/develop)"
+        description: "Target environment branch (main/develop)"
     secrets:
       HELM_REPO_PAT:
         required: true
-        description: "PAT with push access to quickhaul-charts repo"
+        description: "PAT with push access to quickhaul-config repo"
 
 jobs:
   update-chart:
@@ -28,7 +28,7 @@ jobs:
       - name: Checkout Charts Repository
         uses: actions/checkout@v4
         with:
-          repository: QuickHaulTransits/quickhaul-charts
+          repository: QuickHaulTransits/quickhaul-config
           token: ${{ secrets.HELM_REPO_PAT }}
           path: charts
           ref: ${{ inputs.environment }}
@@ -36,30 +36,43 @@ jobs:
       - name: Setup yq
         uses: mikefarah/yq@v4.44.1
 
-      - name: Update image tag
+      - name: Update image configuration
         run: |
-          FILE="charts/microservices/${{ inputs.service-name }}/values.yaml"
+          # Try both potential paths for flexibility
+          FILE="charts/helm-charts/microservices/${{ inputs.service-name }}/values.yaml"
+          if [ ! -f "$FILE" ]; then
+            FILE="charts/charts/${{ inputs.service-name }}/values.yaml"
+          fi
+          
           if [ -f "$FILE" ]; then
             echo "Updating $FILE with tag ${{ inputs.image-tag }}"
+            
+            # Update the image tag
             yq -i ".image.tag = \"${{ inputs.image-tag }}\"" "$FILE"
           else
-            echo "::error::File not found: $FILE (Is your service-name correct?)"
+            echo "::error::File not found in expected locations: $FILE"
             exit 1
           fi
 
       - name: Validate values.yaml
         run: |
-          yq eval '.' "charts/microservices/${{ inputs.service-name }}/values.yaml" > /dev/null
+          FILE="charts/helm-charts/microservices/${{ inputs.service-name }}/values.yaml"
+          if [ ! -f "$FILE" ]; then
+            FILE="charts/charts/${{ inputs.service-name }}/values.yaml"
+          fi
+          yq eval '.' "$FILE" > /dev/null
 
       - name: Commit and Push changes
         run: |
           cd charts
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add microservices/${{ inputs.service-name }}/values.yaml
+          
+          git add .
+          
           if git diff --staged --quiet; then
-            echo "No changes detected"
+            echo "No changes detected (tag might already be up to date)"
           else
-            git commit -m "cd: update ${{ inputs.service-name }} image tag to ${{ inputs.image-tag }} [${{ inputs.environment }}]"
+            git commit -m "cd: update ${{ inputs.service-name }} image version to ${{ inputs.image-tag }} [${{ inputs.environment }}]"
             git push origin ${{ inputs.environment }}
           fi

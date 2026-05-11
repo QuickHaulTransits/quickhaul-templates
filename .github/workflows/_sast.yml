@@ -1,0 +1,76 @@
+# fitforge-shared/.github/workflows/_sast.yml
+name: _SAST — SonarQube Scan
+
+on:
+  workflow_call:
+    inputs:
+      service-path:
+        description: "Path to the service source code"
+        required: false
+        type: string
+        default: "."
+      setup-command:
+        description: "Command to setup environment (e.g. install dependencies)"
+        required: false
+        type: string
+        default: ""
+      test-command:
+        description: "Command to run tests and generate coverage"
+        required: false
+        type: string
+        default: ""
+    secrets:
+      SONAR_TOKEN:
+        required: true
+      SONAR_URL:
+        required: true
+    outputs:
+      quality-gate:
+        description: "Quality gate result (passed/failed)"
+        value: ${{ jobs.sast.outputs.gate_status }}
+
+jobs:
+  sast:
+    name: SonarQube Analysis
+    runs-on: ubuntu-latest
+    outputs:
+      gate_status: ${{ steps.gate.outputs.status }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Environment
+        if: inputs.setup-command != ''
+        run: |
+          cd ${{ inputs.service-path }}
+          ${{ inputs.setup-command }}
+
+      - name: Run Tests
+        if: inputs.test-command != ''
+        run: |
+          cd ${{ inputs.service-path }}
+          ${{ inputs.test-command }}
+
+      - name: Run SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v6
+        with:
+          projectBaseDir: ${{ inputs.service-path }}
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_URL }}
+
+      - name: SonarQube Quality Gate
+        id: gate
+        uses: SonarSource/sonarqube-quality-gate-action@v1
+        with:
+          scanMetadataReportFile: ${{ inputs.service-path }}/.scannerwork/report-task.txt
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Set Gate Output
+        if: always()
+        run: |
+          echo "status=${{ steps.gate.outcome }}" >> $GITHUB_OUTPUT
