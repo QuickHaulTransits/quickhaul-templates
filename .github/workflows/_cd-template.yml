@@ -6,15 +6,11 @@ on:
       service-name:
         required: true
         type: string
-<<<<<<< HEAD
-        description: "Name of the service folder in quickhaul-config/helm-charts/microservices"
-=======
         description: "Name of the service (e.g. auth-service, frontend)"
->>>>>>> 6eb6e6f2cfed82add16c9a2e16fffff88a997b17
       image-tag:
         required: true
         type: string
-        description: "New image tag to update in global-values.yaml"
+        description: "New image tag to update in values.yaml"
       environment:
         required: true
         type: string
@@ -42,38 +38,29 @@ jobs:
 
       - name: Update image configuration
         run: |
-<<<<<<< HEAD
+          # Try both potential paths for flexibility
           FILE="charts/helm-charts/microservices/${{ inputs.service-name }}/values.yaml"
-=======
-          FILE="charts/helm-charts/global-values.yaml"
+          if [ ! -f "$FILE" ]; then
+            FILE="charts/charts/${{ inputs.service-name }}/values.yaml"
+          fi
           
->>>>>>> 6eb6e6f2cfed82add16c9a2e16fffff88a997b17
           if [ -f "$FILE" ]; then
             echo "Updating $FILE with tag ${{ inputs.image-tag }}"
             
-            # Extract basic service name (e.g. auth-service -> auth, frontend -> frontend)
-            SERVICE_PREFIX="${{ inputs.service-name }}"
-            SERVICE_KEY=${SERVICE_PREFIX%-service}
-            
-            # Construct the new immutable container path target
-            NEW_IMAGE="ghcr.io/quickhaultransits/quickhaul-${SERVICE_KEY}:${{ inputs.image-tag }}"
-            
-            # Update the global-values.yaml safely preserving spacing
-            yq -i ".global.images.${SERVICE_KEY} = \"${NEW_IMAGE}\"" "$FILE"
-            
+            # Update the image tag
+            yq -i ".image.tag = \"${{ inputs.image-tag }}\"" "$FILE"
           else
-            echo "::error::File not found: $FILE"
+            echo "::error::File not found in expected locations: $FILE"
             exit 1
           fi
 
       - name: Validate values.yaml
         run: |
-          # Ensure the YAML is still valid after modification
-<<<<<<< HEAD
-          yq eval '.' "charts/helm-charts/microservices/${{ inputs.service-name }}/values.yaml" > /dev/null
-=======
-          yq eval '.' "charts/helm-charts/global-values.yaml" > /dev/null
->>>>>>> 6eb6e6f2cfed82add16c9a2e16fffff88a997b17
+          FILE="charts/helm-charts/microservices/${{ inputs.service-name }}/values.yaml"
+          if [ ! -f "$FILE" ]; then
+            FILE="charts/charts/${{ inputs.service-name }}/values.yaml"
+          fi
+          yq eval '.' "$FILE" > /dev/null
 
       - name: Commit and Push changes
         run: |
@@ -81,16 +68,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
-<<<<<<< HEAD
-          # Stage the specific values file
-          git add helm-charts/microservices/${{ inputs.service-name }}/values.yaml
-=======
-          # Stage the unified global values file
-          git add helm-charts/global-values.yaml
->>>>>>> 6eb6e6f2cfed82add16c9a2e16fffff88a997b17
+          git add .
           
           if git diff --staged --quiet; then
-            echo "No changes detected in global-values.yaml (tag might already be up to date)"
+            echo "No changes detected (tag might already be up to date)"
           else
             git commit -m "cd: update ${{ inputs.service-name }} image version to ${{ inputs.image-tag }} [${{ inputs.environment }}]"
             git push origin ${{ inputs.environment }}
